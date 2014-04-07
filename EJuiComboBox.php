@@ -32,6 +32,8 @@ class EJuiComboBox extends CJuiInputWidget
 	 */
 	public $scriptSelector;
 	public $defaultOptions = array('allowText' => true);
+	public $ajaxRefresh = false; 
+	// ^--- Addition by c@cba - To make widget work as filter in CGridView after refresh. See also related addition below.
 
 	protected function setSelector($id, $script, $event=null)
 	{
@@ -48,11 +50,48 @@ class EJuiComboBox extends CJuiInputWidget
 
 	public function init()
 	{
-		$cs = Yii::app()->getClientScript();
-		$assets = Yii::app()->getAssetManager()->publish(dirname(__FILE__) . '/assets');
+		/*$assets = Yii::app()->getAssetManager()->publish(dirname(__FILE__) . '/assets');
 		$cs->registerScriptFile($assets . '/jquery.ui.widget.min.js');
-		$cs->registerScriptFile($assets . '/jquery.ui.combobox.js');
-
+		$cs->registerScriptFile($assets . '/jquery.ui.combobox.js');*/
+		/*
+		 * Addition by c@cba - start
+		 * To resolve button conflict between bootstrap and jQueryUI ( see https://github.com/twbs/bootstrap/issues/6094 )
+		 * In the main config file "protected/config/main.php", place the code:
+			'components'=>array(
+			...
+				'clientScript'=>array(
+					'packages'=>array(
+						'bootstrap'=>array(
+							'basePath'=>'webroot.my_assets',
+							'js'=>array('js/bootstrap.js'),
+							'css'=>array('css/bootstrap.css'),
+							'depends'=>array('jquery', 'jquery.ui'),
+						),
+						'bs_button_noconflict'=>array(
+							'basePath'=>'webroot.my_assets',
+							'js'=>array('js/bs_button_noconflict.js'),
+							'depends'=>array('bootstrap'),
+						),
+					),
+				),
+			),
+		 * In the main layout file "protected/views/layouts/main.php", place the code:
+			$cs = Yii::app()->getClientScript();
+			$cs->registerCoreScript('jquery');
+			$cs->registerCoreScript('jquery.ui');
+			$cs->registerPackage('bootstrap');
+			$cs->registerPackage('bs_button_noconflict');
+		 */
+		$cs = Yii::app()->getClientScript();
+		$cs->addPackage('combobox',array(
+			'basePath'=>'ext.combobox.assets',
+			'js'=>array('jquery.ui.widget.min.js', 'jquery.ui.combobox.js'),
+			'depends'=>array('jquery', 'jquery.ui', 'bootstrap', 'bs_button_noconflict'),
+		));
+		$cs->registerPackage('combobox');
+		$this->defaultOptions['showAllText'] = Yii::t('EJuiComboBox.EJuiComboBox','Show All Items');
+		
+		/* Addition by c@cba - end */
 		parent::init();
 	}
 
@@ -71,7 +110,18 @@ class EJuiComboBox extends CJuiInputWidget
 		else
 			$data = array();
 
-		echo CHtml::dropDownList(null, null, $data, array('id' => $id . '_select', 'style'=>'display:none;'));
+		echo CHtml::dropDownList(null, null, $data, array('id' => $id . '_select'));
+		/*
+		 * Modification by c@cba - start
+		 * Hiding the select-element by adding the css-style 'display:none' to the dropDownHtmlOptions
+		 * is not preferable in terms of graceful degradation (for JS-disabled) >> removed that style element.
+		 * Wanted to hide the select-element directly after the element is rendered, by using the following code:
+		 * echo '<script type="text/javascript"> $("#'.$id.'_select").hide(); </script>';
+		 * ( see: http://www.electrictoolbox.com/jquery-hide-text-page-load-show-later/ )
+		 * Problem: (16.01.2013) when thus hidden, in the js-script the select-element cannot be found, 
+		 * 	its options cannot be matched. autocomplete does not work...
+		 * Modification by c@cba - end
+		 */
 
 		if ($this->hasModel())
 			echo CHtml::activeTextField($this->model, $this->attribute, $this->htmlOptions);
@@ -85,8 +135,19 @@ class EJuiComboBox extends CJuiInputWidget
 		$cs = Yii::app()->getClientScript();
 
 		$js = "combobox({$options});";
-
+		
 		list($id, $js) = $this->setSelector($id, $js);
+		
+		
+		/* 
+		 * Addition by c@cba - start 
+		 * Re-initiate combobox after the part of the page containing it is refreshed via ajax.
+		 */
+		if($this->ajaxRefresh) { // Idea by jeremy@Yii, see comment on EchMultiSelect extension page...
+			$js .= "jQuery('body').ajaxComplete(function() { $js });";
+		}
+		/* Addition by c@cba - end */
+
 		$cs->registerScript(__CLASS__ . '#' . $id, $js);
 	}
 

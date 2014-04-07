@@ -3,11 +3,11 @@
 	$.widget("ui.combobox", {
 		_create: function() {
 			var options = this.options;
-
 			var self = this,
 			input = this.element,
-			select = input.prev("select").hide();
-
+			select = input.prev("select");
+			select.hide();
+			
 			input.autocomplete({
 				delay: 0,
 				minLength: 0,
@@ -59,7 +59,11 @@
 					}
 				}
 			})
-			.addClass("ui-widget ui-widget-content ui-corner-left");
+			.addClass("ui-widget ui-widget-content");
+			/* ^--- Modification by c@cba :: replaced
+			 * .addClass("ui-widget ui-widget-content ui-corner-left"); 
+			 * Don't want rounded corners
+			 */
 
 			input.data("autocomplete")._renderItem = function(ul, item) {
 				return $("<li></li>")
@@ -70,16 +74,21 @@
 
 			this.button = $("<button type='button'>&nbsp;</button>")
 			.attr("tabIndex", -1 )
-			.attr("title", "Show All Items")
+			.attr("title", options.showAllText)
+			/* ^--- Modification by c@cba :: replaced
+			 * .attr("title", "Show All Items")
+			 * to allow translation with Yii
+			 */
 			.attr("id", 'btn')
 			.insertAfter(input)
 			.button({
 				icons: {
 					primary: "ui-icon-triangle-1-s"
 				},
-				text: false
+				text: false,
 			})
 			.removeClass("ui-corner-all")
+			.removeClass("ui-corner-left") // <--- Addition by c@cba
 			.addClass("ui-corner-right ui-button-icon")
 			.click(function() {
 				// close if already visible
@@ -95,7 +104,9 @@
 			});
 		},
 		destroy: function() {
-			this.input.remove();
+			if (this.input !== undefined) {
+				this.input.remove();
+			} // <--- Modification by c@cba :: added "if" because of some bug...
 			this.button.remove();
 			this.element.show();
 			$.Widget.prototype.destroy.call(this);
